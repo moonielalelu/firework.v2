@@ -1,24 +1,291 @@
-<!DOCTYPE html>
-<html lang="de">
-<head>
-<meta charset="UTF-8">
-<title>Fireworks</title>
 
 <style>
-body{
-  margin:0;
-  background:#050505;
-  overflow:hidden;
-}
-canvas{
-  display:block;
-}
+body-override,h2.sr-only{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0,0,0,0)}
+#wrap{position:relative;width:100%;height:520px;background:#050505;border-radius:12px;overflow:hidden;cursor:crosshair}
+canvas{display:block;width:100%;height:100%}
+#ui{position:absolute;top:10px;left:10px;display:flex;gap:8px;flex-wrap:wrap}
+button.fb{background:rgba(255,255,255,0.08);border:0.5px solid rgba(255,255,255,0.2);color:#fff;font-size:12px;padding:5px 10px;border-radius:6px;cursor:pointer}
+button.fb:hover{background:rgba(255,255,255,0.16)}
+#info{position:absolute;bottom:8px;right:10px;font-size:11px;color:rgba(255,255,255,0.25)}
 </style>
-</head>
-<body>
+<h2 class="sr-only">Interaktives Feuerwerk – klicke oder wähle Effekte aus</h2>
+<div id="wrap">
+  <canvas id="c"></canvas>
+  <div id="ui">
+    <button class="fb" onclick="autoMode=!autoMode;this.textContent=autoMode?'⏸ Pause':'▶ Auto'">⏸ Pause</button>
+    <button class="fb" onclick="spawnRocket('normal')">💥 Normal</button>
+    <button class="fb" onclick="spawnRocket('star')">⭐ Stern</button>
+    <button class="fb" onclick="spawnRocket('ring')">💍 Ring</button>
+    <button class="fb" onclick="spawnRocket('heart')">❤️ Herz</button>
+    <button class="fb" onclick="spawnRocket('chrysanthemum')">🌸 Chrysantheme</button>
+    <button class="fb" onclick="spawnRocket('willow')">🌿 Weide</button>
+    <button class="fb" onclick="spawnMega()">🔥 MEGA</button>
+  </div>
+  <div id="info">Klick irgendwo zum Abfeuern</div>
+</div>
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+const wrap = document.getElementById('wrap');
 
-<canvas id="c"></canvas>
-<script src="script.js"></script>
+function resize(){
+  canvas.width = wrap.offsetWidth;
+  canvas.height = wrap.offsetHeight;
+}
+resize();
+window.addEventListener('resize', resize);
 
-</body>
-</html>
+let rockets=[], particles=[], shockwaves=[], glitters=[];
+let autoMode=true;
+let lastAuto=0;
+
+const TAU = Math.PI*2;
+
+class Particle {
+  constructor(x,y,dx,dy,life,hue,sat=100,lit=60,size=2,gravity=0.06,alpha=1){
+    this.x=x; this.y=y; this.dx=dx; this.dy=dy;
+    this.life=life; this.maxLife=life;
+    this.hue=hue; this.sat=sat; this.lit=lit;
+    this.size=size; this.gravity=gravity; this.alpha=alpha;
+    this.drag=0.97;
+  }
+  update(){
+    this.dx*=this.drag; this.dy*=this.drag;
+    this.x+=this.dx; this.y+=this.dy;
+    this.dy+=this.gravity; this.life--;
+  }
+  draw(){
+    let a=(this.life/this.maxLife)*this.alpha;
+    ctx.beginPath();
+    ctx.arc(this.x,this.y,this.size*(0.3+0.7*a),0,TAU);
+    ctx.fillStyle=`hsla(${this.hue},${this.sat}%,${this.lit}%,${a})`;
+    ctx.fill();
+  }
+}
+
+class GlitterParticle {
+  constructor(x,y,hue){
+    this.x=x; this.y=y;
+    this.dx=(Math.random()-0.5)*2;
+    this.dy=(Math.random()-0.5)*2-1;
+    this.hue=hue;
+    this.life=60+Math.random()*40;
+    this.maxLife=this.life;
+    this.s=1+Math.random()*2;
+  }
+  update(){ this.x+=this.dx; this.y+=this.dy; this.dy+=0.04; this.life--; }
+  draw(){
+    let a=this.life/this.maxLife;
+    ctx.save();
+    ctx.translate(this.x,this.y);
+    ctx.rotate(this.life*0.3);
+    ctx.fillStyle=`hsla(${this.hue},100%,85%,${a})`;
+    let s=this.s*a;
+    ctx.fillRect(-s,-s,s*2,s*2);
+    ctx.restore();
+  }
+}
+
+class Shockwave {
+  constructor(x,y,color){
+    this.x=x; this.y=y; this.r=0; this.life=40; this.color=color;
+  }
+  update(){ this.r+=8; this.life--; }
+  draw(){
+    let a=this.life/40;
+    ctx.beginPath();
+    ctx.arc(this.x,this.y,this.r,0,TAU);
+    ctx.strokeStyle=`hsla(${this.color},80%,70%,${a*0.4})`;
+    ctx.lineWidth=3*a;
+    ctx.stroke();
+  }
+}
+
+class Rocket {
+  constructor(tx, ty, type='normal', hue=null){
+    this.x = tx || (Math.random()*canvas.width*0.7+canvas.width*0.15);
+    this.y = canvas.height;
+    this.tx = tx || this.x + (Math.random()-0.5)*80;
+    this.target = ty || (canvas.height*0.1 + Math.random()*canvas.height*0.45);
+    this.hue = hue !== null ? hue : Math.random()*360;
+    this.type = type;
+    this.trail=[];
+    this.speed = 6+Math.random()*4;
+    this.vx = (this.tx - this.x) / ((this.y-this.target)/this.speed) * 0.05;
+  }
+  update(){
+    this.trail.push({x:this.x,y:this.y});
+    if(this.trail.length>10) this.trail.shift();
+    this.x += this.vx;
+    this.y -= this.speed;
+    this.trail.forEach((t,i)=>{
+      let a=i/this.trail.length;
+      ctx.beginPath();
+      ctx.arc(t.x,t.y,1.5*a,0,TAU);
+      ctx.fillStyle=`hsla(${this.hue},100%,70%,${a*0.7})`;
+      ctx.fill();
+    });
+    ctx.beginPath();
+    ctx.arc(this.x,this.y,3,0,TAU);
+    ctx.fillStyle='white';
+    ctx.fill();
+    ctx.beginPath();
+    ctx.arc(this.x,this.y,5,0,TAU);
+    ctx.fillStyle=`hsla(${this.hue},100%,70%,0.3)`;
+    ctx.fill();
+  }
+  explode(){
+    shockwaves.push(new Shockwave(this.x,this.y,this.hue));
+    for(let i=0;i<12;i++) glitters.push(new GlitterParticle(this.x,this.y,this.hue));
+    switch(this.type){
+      case 'normal':   explodeNormal(this.x,this.y,this.hue); break;
+      case 'star':     explodeStar(this.x,this.y,this.hue); break;
+      case 'ring':     explodeRing(this.x,this.y,this.hue); break;
+      case 'heart':    explodeHeart(this.x,this.y,this.hue); break;
+      case 'chrysanthemum': explodeChrysanthemum(this.x,this.y,this.hue); break;
+      case 'willow':   explodeWillow(this.x,this.y,this.hue); break;
+    }
+  }
+}
+
+function explodeNormal(x,y,hue){
+  for(let i=0;i<120;i++){
+    let speed=(1+Math.random()*4);
+    let a=Math.random()*TAU;
+    particles.push(new Particle(x,y,Math.cos(a)*speed,Math.sin(a)*speed,80+Math.random()*40,hue,100,60+Math.random()*20));
+  }
+  for(let i=0;i<40;i++){
+    let speed=(0.5+Math.random()*2);
+    let a=Math.random()*TAU;
+    particles.push(new Particle(x,y,Math.cos(a)*speed,Math.sin(a)*speed,100,hue+30,100,80,1.5,0.04));
+  }
+}
+
+function explodeStar(x,y,hue){
+  let pts=7;
+  for(let p=0;p<pts;p++){
+    let baseAngle=(p/pts)*TAU;
+    for(let s of [2,3.5,5]){
+      let jitter=(Math.random()-0.5)*0.15;
+      particles.push(new Particle(x,y,Math.cos(baseAngle+jitter)*s,Math.sin(baseAngle+jitter)*s,120+Math.random()*30,hue,100,65,2.5,0.04,0.9));
+      if(s===3.5) particles.push(new Particle(x,y,Math.cos(baseAngle+jitter)*s*0.6,Math.sin(baseAngle+jitter)*s*0.6,90,hue+40,100,80,1.5,0.04));
+    }
+  }
+  for(let i=0;i<30;i++){
+    let a=Math.random()*TAU; let sp=Math.random()*2;
+    particles.push(new Particle(x,y,Math.cos(a)*sp,Math.sin(a)*sp,60,hue+60,80,85,1,0.03));
+  }
+}
+
+function explodeRing(x,y,hue){
+  let n=60;
+  for(let i=0;i<n;i++){
+    let a=(i/n)*TAU;
+    let sp=3.5+Math.random()*0.5;
+    particles.push(new Particle(x,y,Math.cos(a)*sp,Math.sin(a)*sp,100,hue,100,65,2.2,0.03));
+    if(i%3===0) particles.push(new Particle(x,y,Math.cos(a)*sp*1.3,Math.sin(a)*sp*1.3,80,hue+30,100,80,1.5,0.035));
+  }
+}
+
+function explodeHeart(x,y,hue){
+  let n=80;
+  for(let i=0;i<n;i++){
+    let t=(i/n)*TAU;
+    let hx=16*Math.pow(Math.sin(t),3);
+    let hy=-(13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t));
+    let scale=0.22+Math.random()*0.04;
+    particles.push(new Particle(x,y,hx*scale,hy*scale,110+Math.random()*20,hue,100,65,2,0.02,0.9));
+  }
+  for(let i=0;i<30;i++){
+    let t=Math.random()*TAU;
+    let hx=16*Math.pow(Math.sin(t),3)*0.18;
+    let hy=-(13*Math.cos(t)-5*Math.cos(2*t)-2*Math.cos(3*t)-Math.cos(4*t))*0.18;
+    particles.push(new Particle(x,y,hx,hy,90,hue+20,100,80,1.2,0.02));
+  }
+}
+
+function explodeChrysanthemum(x,y,hue){
+  let layers=[{n:60,sp:4,life:130},{n:40,sp:2.5,life:160},{n:20,sp:1.2,life:180}];
+  layers.forEach((l,li)=>{
+    for(let i=0;i<l.n;i++){
+      let a=(i/l.n)*TAU+(li*0.3);
+      let sp=l.sp+Math.random()*0.5;
+      particles.push(new Particle(x,y,Math.cos(a)*sp,Math.sin(a)*sp,l.life,hue+(li*25),100,60+li*10,2-li*0.3,0.025,0.95));
+    }
+  });
+}
+
+function explodeWillow(x,y,hue){
+  let n=50;
+  for(let i=0;i<n;i++){
+    let a=(i/n)*TAU;
+    let sp=3+Math.random()*2;
+    particles.push(new Particle(x,y,Math.cos(a)*sp,Math.sin(a)*sp,160,hue,90,65,1.8,0.12,0.85));
+  }
+  for(let i=0;i<n;i++){
+    let a=(i/n)*TAU;
+    let sp=1.5+Math.random()*1.5;
+    particles.push(new Particle(x,y,Math.cos(a)*sp,Math.sin(a)*sp,120,hue+40,80,75,1.2,0.1,0.7));
+  }
+}
+
+function spawnRocket(type, tx, ty){
+  rockets.push(new Rocket(tx,ty,type));
+}
+
+function spawnMega(){
+  let types=['normal','star','ring','heart','chrysanthemum','willow'];
+  let cx=canvas.width/2, cy=canvas.height*0.3;
+  let spread=120;
+  types.forEach((t,i)=>{
+    setTimeout(()=>{
+      let angle=(i/types.length)*TAU;
+      rockets.push(new Rocket(
+        cx+Math.cos(angle)*spread*0.3,
+        null,
+        t,
+        (i/types.length)*360
+      ));
+    }, i*120);
+  });
+}
+
+const TYPES=['normal','normal','normal','star','ring','heart','chrysanthemum','willow'];
+
+wrap.addEventListener('click',(e)=>{
+  let r=canvas.getBoundingClientRect();
+  let px=(e.clientX-r.left)*(canvas.width/r.width);
+  let py=(e.clientY-r.top)*(canvas.height/r.height);
+  let type=TYPES[Math.floor(Math.random()*TYPES.length)];
+  rockets.push(new Rocket(px+(Math.random()-0.5)*30, py+(Math.random()-0.5)*30, type));
+});
+
+function animate(ts){
+  ctx.fillStyle='rgba(0,0,0,0.18)';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  if(autoMode && ts-lastAuto>500){
+    lastAuto=ts;
+    let type=TYPES[Math.floor(Math.random()*TYPES.length)];
+    rockets.push(new Rocket(null,null,type));
+    if(Math.random()<0.08) spawnMega();
+  }
+
+  rockets=rockets.filter(r=>{
+    r.update();
+    if(r.y<=r.target){
+      r.explode();
+      return false;
+    }
+    return true;
+  });
+
+  shockwaves=shockwaves.filter(s=>{ s.update(); s.draw(); return s.life>0; });
+  particles=particles.filter(p=>{ p.update(); p.draw(); return p.life>0; });
+  glitters=glitters.filter(g=>{ g.update(); g.draw(); return g.life>0; });
+
+  requestAnimationFrame(animate);
+}
+
+requestAnimationFrame(animate);
+</script>
