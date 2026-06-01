@@ -12,7 +12,7 @@ button.fb:hover{background:rgba(255,255,255,0.16)}
 <div id="wrap">
   <canvas id="c"></canvas>
   <div id="ui">
-    <button class="fb" onclick="autoMode=!autoMode;this.textContent=autoMode?'⏸ Pause':'▶ Auto'">⏸ Pause</button>
+    <button class="fb" onclick="autoMode=!autoMode;this.textContent=autoMode?'□ Pause':'》 Auto'"> □ Pause</button>
     <button class="fb" onclick="spawnRocket('normal')"> Normal</button>
     <button class="fb" onclick="spawnRocket('star')"> Stern</button>
     <button class="fb" onclick="spawnRocket('ring')"> Ring</button>
@@ -21,7 +21,7 @@ button.fb:hover{background:rgba(255,255,255,0.16)}
     <button class="fb" onclick="spawnRocket('willow')"> Weide</button>
     <button class="fb" onclick="spawnMega()"> MEGA</button>
   </div>
-  <div id="info">Klick irgendwo zum Abfeuern</div>
+  <div id="info">click anywhere to fire</div>
 </div>
 <script>
 const canvas = document.getElementById('c');
