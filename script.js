@@ -13,13 +13,13 @@ button.fb:hover{background:rgba(255,255,255,0.16)}
   <canvas id="c"></canvas>
   <div id="ui">
     <button class="fb" onclick="autoMode=!autoMode;this.textContent=autoMode?'⏸ Pause':'▶ Auto'">⏸ Pause</button>
-    <button class="fb" onclick="spawnRocket('normal')">💥 Normal</button>
-    <button class="fb" onclick="spawnRocket('star')">⭐ Stern</button>
-    <button class="fb" onclick="spawnRocket('ring')">💍 Ring</button>
-    <button class="fb" onclick="spawnRocket('heart')">❤️ Herz</button>
-    <button class="fb" onclick="spawnRocket('chrysanthemum')">🌸 Chrysantheme</button>
-    <button class="fb" onclick="spawnRocket('willow')">🌿 Weide</button>
-    <button class="fb" onclick="spawnMega()">🔥 MEGA</button>
+    <button class="fb" onclick="spawnRocket('normal')"> Normal</button>
+    <button class="fb" onclick="spawnRocket('star')"> Stern</button>
+    <button class="fb" onclick="spawnRocket('ring')"> Ring</button>
+    <button class="fb" onclick="spawnRocket('heart')"> Herz</button>
+    <button class="fb" onclick="spawnRocket('chrysanthemum')"> Chrysantheme</button>
+    <button class="fb" onclick="spawnRocket('willow')"> Weide</button>
+    <button class="fb" onclick="spawnMega()"> MEGA</button>
   </div>
   <div id="info">Klick irgendwo zum Abfeuern</div>
 </div>
